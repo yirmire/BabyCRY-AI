@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BabyCry AI</title>
+    
+    <!-- Bibliotecas essenciais via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase App (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .baby-gradient { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
+        .record-pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root">
+        <!-- Loader inicial para o usuário não ver tela branca -->
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Configurações Reais do Usuário
+        const firebaseConfig = {
+            apiKey: "AIzaSyAtVUGLgXWjAJk8J4AKPoSflngsRFrqBUk",
+            authDomain: "babycry-ai-1e92b.firebaseapp.com",
+            projectId: "babycry-ai-1e92b",
+            storageBucket: "babycry-ai-1e92b.firebasestorage.app",
+            messagingSenderId: "1079894868861",
+            appId: "1:1079894868861:web:51172c3a2def65a7964214"
+        };
+        const GEMINI_KEY = "AIzaSyCus8xqmmpohjS427Ajubfp2U8_ELKq_ew";
+
+        // Inicializar Firebase (Modo Compat para rodar no browser direto)
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Componentes de Ícones Simples (SVG Inline para não depender de outra lib)
+        const IconMic = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
+        const IconHistory = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>;
+        const IconBaby = ({size=24}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3"/><path d="M12 2.1a5 5 0 0 1 5 5v.1a2 2 0 0 1-2 2 2 2 0 0 1-2-2V7a1 1 0 0 0-1-1 1 1 0 0 0-1 1v.2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V7a5 5 0 0 1 5-4.9Z"/></svg>;
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('home');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [isRecording, setIsRecording] = useState(false);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [result, setResult] = useState(null);
+            const [history, setHistory] = useState([]);
+
+            useEffect(() => {
+                const unsub = auth.onAuthStateChanged(u => setUser(u));
+                return () => unsub();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsub = db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history")
+                    .orderBy("createdAt", "desc").limit(20)
+                    .onSnapshot(snap => {
+                        setHistory(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    });
+                return () => unsub();
+            }, [user]);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch (err) {
+                    try {
+                        await auth.createUserWithEmailAndPassword(email, password);
+                    } catch (e2) { alert("Erro: " + e2.message); }
+                }
+                setLoading(false);
+            };
+
+            const startAnalysis = async () => {
+                if (isRecording) return;
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    setIsRecording(true);
+                    setResult(null);
+                    
+                    setTimeout(async () => {
+                        setIsRecording(false);
+                        setIsAnalyzing(true);
+                        stream.getTracks().forEach(t => t.stop());
+                        
+                        try {
+                            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_KEY}`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    contents: [{ parts: [{ text: "Analise o choro e diga se é Fome, Sono ou Dor. Responda JSON: { \"causa\": \"...\", \"sugestao\": \"...\" }" }] }],
+                                    generationConfig: { responseMimeType: "application/json" }
+                                })
+                            });
+                            const data = await res.json();
+                            const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+                            
+                            await db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history").add({
+                                ...parsed, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            setResult(parsed);
+                        } catch (e) { alert("Erro na IA"); }
+                        setIsAnalyzing(false);
+                    }, 4000);
+                } catch (e) { alert("Ative o microfone!"); }
+            };
+
+            if (!user) return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
+                    <div className="baby-gradient p-5 rounded-[2rem] shadow-xl mb-8">
+                        <IconBaby size={48} color="white"/>
+                    </div>
+                    <h1 className="text-3xl font-extrabold mb-2 text-slate-800 tracking-tight">BabyCry AI</h1>
+                    <p className="text-slate-400 mb-8 text-center text-sm">Entre ou crie uma conta para traduzir o choro.</p>
+                    
+                    <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
+                        <input type="email" placeholder="E-mail" className="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setEmail(e.target.value)} required />
+                        <input type="password" placeholder="Senha" className="w-full p-4 bg-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setPassword(e.target.value)} required />
+                        <button className="w-full py-4 baby-gradient text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all">
+                            {loading ? "Processando..." : "Entrar / Cadastrar"}
+                        </button>
+                    </form>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen max-w-md mx-auto bg-white flex flex-col">
+                    <header className="p-6 flex justify-between items-center border-b">
+                        <div className="flex items-center gap-2 font-extrabold text-xl text-indigo-600 tracking-tighter">
+                            <IconBaby size={24}/> BabyCry
+                        </div>
+                        <button onClick={()=>auth.signOut()} className="text-slate-300"><IconHistory/></button>
+                    </header>
+
+                    <main className="flex-1 p-6 flex flex-col items-center justify-center space-y-12">
+                        {view === 'home' && (
+                            <>
+                                <button 
+                                    onClick={startAnalysis}
+                                    className={`w-48 h-48 rounded-full flex flex-col items-center justify-center transition-all ${isRecording ? 'bg-red-500 record-pulse' : 'baby-gradient shadow-2xl shadow-indigo-200 active:scale-90'}`}
+                                >
+                                    <div className="text-white">
+                                        <IconMic />
+                                    </div>
+                                    <span className="text-white text-[10px] font-black uppercase mt-3 tracking-widest">
+                                        {isRecording ? "Ouvindo..." : "Traduzir"}
+                                    </span>
+                                </button>
+                                
+                                {isAnalyzing && <p className="text-indigo-600 font-bold animate-pulse">Consultando IA...</p>}
+                                
+                                {result && (
+                                    <div className="w-full p-8 baby-gradient text-white rounded-[2.5rem] shadow-xl animate-in fade-in zoom-in duration-300">
+                                        <h2 className="text-4xl font-black mb-2 tracking-tighter">{result.causa}</h2>
+                                        <p className="font-bold opacity-90 leading-tight">{result.sugestao}</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        
+                        {view === 'history' && (
+                            <div className="w-full h-full space-y-4 overflow-y-auto">
+                                <h2 className="text-2xl font-black mb-6">Últimos Registros</h2>
+                                {history.map(h => (
+                                    <div key={h.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold text-slate-800">{h.causa}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{h.createdAt?.toDate().toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    <nav className="p-4 border-t flex justify-around bg-white/80 backdrop-blur sticky bottom-0">
+                        <button onClick={()=>setView('home')} className={`p-3 rounded-2xl ${view==='home'?'bg-indigo-50 text-indigo-600':'text-slate-300'}`}><IconMic/></button>
+                        <button onClick={()=>setView('history')} className={`p-3 rounded-2xl ${view==='history'?'bg-indigo-50 text-indigo-600':'text-slate-300'}`}><IconHistory/></button>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
