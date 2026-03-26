@@ -3,52 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BabyCry AI - Tradutor de Choro Real</title>
+    <title>BabyCry AI - Tradutor Real</title>
     
+    <!-- Bibliotecas Base (Ordem de Carregamento Garantida) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Firebase Compat (Mais estável para Navegadores de Telemóvel) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { baby: { light: '#EEF2FF', prime: '#4F46E5', dark: '#3730A3', accent: '#F472B6' } }
-                }
-            }
-        }
-    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        body { -webkit-tap-highlight-color: transparent; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .dark .glass { background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .baby-btn-grad { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); transition: all 0.3s ease; }
-        .baby-btn-grad:active { transform: scale(0.95); opacity: 0.9; }
-        .animate-in { animation: animateIn 0.3s ease-out; }
-        @keyframes animateIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .pulse-soft { animation: pulseSoft 2s infinite; }
-        @keyframes pulseSoft { 0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(99, 102, 241, 0); } 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); } }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .baby-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .dark-glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .record-pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        /* Estilo para esconder o scrollbar */
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300 antialiased">
+<body class="bg-slate-50 transition-colors duration-300">
     <div id="root">
-        <div class="flex items-center justify-center min-h-screen">
-            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-baby-prime"></div>
+        <!-- Loader Visível caso o JS demore -->
+        <div class="flex flex-col items-center justify-center min-h-screen space-y-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600"></div>
+            <p id="loading-msg" class="text-xs text-slate-400 font-medium">A carregar módulos...</p>
         </div>
     </div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
-        // Configurações do Firebase
+        // --- CREDENCIAIS ---
         const firebaseConfig = {
             apiKey: "AIzaSyAtVUGLgXWjAJk8J4AKPoSflngsRFrqBUk",
             authDomain: "babycry-ai-1e92b.firebaseapp.com",
@@ -59,73 +51,89 @@
         };
         const GEMINI_KEY = "AIzaSyCus8xqmmpohjS427Ajubfp2U8_ELKq_ew";
 
-        // Inicializar
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        // Inicializar Firebase Blindado
+        try {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        } catch (e) {
+            document.getElementById('loading-msg').innerText = "Erro ao ligar ao Firebase";
+        }
+
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Ícones Inline SVG
-        const Icon = ({d, size=24}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;
-        const iMic = "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3";
-        const iHistory = "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2";
-        const iBaby = "M9 12h.01 M15 12h.01 M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5 M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3 M12 2.1a5 5 0 0 1 5 5v.1 M12 2.1a5 5 0 0 0-5 5v.1";
-        const iSettings = "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z";
-        const iHeart = "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z";
-        const iCopy = "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M12 2v4 M9 4h6";
-        const iCheck = "M20 6 9 17l-5-5";
-        const iMail = "M22 6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6Z M22 6l-10 7L2 6";
-        const iLock = "M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Z M7 11V7a5 5 0 0 1 10 0v4";
+        // --- COMPONENTES DE ÍCONES (SVG Puro para evitar falhas de carga) ---
+        const Icon = ({d, size=24, className=""}) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d}/></svg>
+        );
+
+        const paths = {
+            mic: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3",
+            history: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2",
+            baby: "M9 12h.01 M15 12h.01 M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5 M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3 M12 2.1a5 5 0 0 1 5 5v.1",
+            heart: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z",
+            settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+            trash: "M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+            copy: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M12 2v4",
+            check: "M20 6 9 17l-5-5",
+            logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9"
+        };
 
         const App = () => {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('home');
-            const [authData, setAuthData] = useState({ email: '', password: '' });
-            const [loading, setLoading] = useState(false);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [loading, setLoading] = useState(true);
             const [isRecording, setIsRecording] = useState(false);
             const [isAnalyzing, setIsAnalyzing] = useState(false);
             const [result, setResult] = useState(null);
             const [history, setHistory] = useState([]);
             const [copied, setCopied] = useState(false);
-            const [appSettings, setAppSettings] = useState(() => {
-                const saved = localStorage.getItem('babycry_settings');
-                return saved ? JSON.parse(saved) : { darkMode: false, babyName: '', babyDob: '', sensitivity: 75 };
+            
+            // Configurações do App
+            const [config, setConfig] = useState(() => {
+                const saved = localStorage.getItem('babycry_v3_config');
+                return saved ? JSON.parse(saved) : { darkMode: false, babyName: 'Meu Bebé', sensitivity: 70 };
             });
 
-            // Efeitos
             useEffect(() => {
-                const unsub = auth.onAuthStateChanged(u => setUser(u));
+                localStorage.setItem('babycry_v3_config', JSON.stringify(config));
+                if (config.darkMode) document.body.classList.add('bg-slate-900');
+                else document.body.classList.remove('bg-slate-900');
+            }, [config]);
+
+            // Auth
+            useEffect(() => {
+                const unsub = auth.onAuthStateChanged(u => {
+                    setUser(u);
+                    setLoading(false);
+                });
                 return () => unsub();
             }, []);
 
-            useEffect(() => {
-                localStorage.setItem('babycry_settings', JSON.stringify(appSettings));
-                if (appSettings.darkMode) document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            }, [appSettings]);
-
+            // History
             useEffect(() => {
                 if (!user) return;
                 const unsub = db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history")
                     .orderBy("createdAt", "desc").limit(20)
-                    .onSnapshot(snap => setHistory(snap.docs.map(d => ({id: d.id, ...d.data()}))), err => console.error(err));
+                    .onSnapshot(snap => {
+                        setHistory(snap.docs.map(d => ({id: d.id, ...d.data()})));
+                    }, err => console.log("Erro Firestore:", err));
                 return () => unsub();
             }, [user]);
 
-            // Lógica
             const handleLogin = async (e) => {
                 e.preventDefault();
-                setLoading(true);
                 try {
-                    await auth.signInWithEmailAndPassword(authData.email, authData.password);
+                    await auth.signInWithEmailAndPassword(email, password);
                 } catch (err) {
                     try {
-                        await auth.createUserWithEmailAndPassword(authData.email, authData.password);
-                    } catch (e2) { alert("Falha: " + e2.message); }
+                        await auth.createUserWithEmailAndPassword(email, password);
+                    } catch (e2) { alert("Erro: " + e2.message); }
                 }
-                setLoading(false);
             };
 
-            const startAnalysis = async () => {
+            const translateCry = async () => {
                 if (isRecording) return;
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -138,11 +146,12 @@
                         stream.getTracks().forEach(t => t.stop());
                         
                         try {
+                            const prompt = `Analise o perfil de choro. Use o método Dunstan. Responda em JSON: { "causa": "string", "sugestao": "string" }`;
                             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_KEY}`, {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
                                 body: JSON.stringify({
-                                    contents: [{ parts: [{ text: `Analise o choro (Sensibilidade IA definida em ${appSettings.sensitivity}%). Classifique: Fome, Sono, Dor ou Desconforto. Responda JSON: { "causa": "...", "sugestao": "..." }` }] }],
+                                    contents: [{ parts: [{ text: prompt }] }],
                                     generationConfig: { responseMimeType: "application/json" }
                                 })
                             });
@@ -153,10 +162,10 @@
                                 ...parsed, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
                             setResult(parsed);
-                        } catch (e) { alert("A IA falhou. Tente novamente."); }
+                        } catch (e) { alert("IA ocupada. Tente novamente."); }
                         setIsAnalyzing(false);
                     }, 4000);
-                } catch (e) { alert("Ative o microfone para usar!"); }
+                } catch (e) { alert("Ative o microfone para traduzir."); }
             };
 
             const copyPix = () => {
@@ -165,121 +174,136 @@
                 setTimeout(() => setCopied(false), 2000);
             };
 
-            const Card = ({children, className=""}) => <div className={`glass rounded-3xl p-6 shadow-sm ${className}`}>{children}</div>;
-            const Input = (props) => <input {...props} className="w-full p-4 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-baby-prime transition-all text-sm dark:text-white" />;
-            const NavBtn = ({icon: IconComponent, viewName}) => (
-                <button onClick={()=>setView(viewName)} className={`p-4 rounded-2xl flex flex-col items-center gap-1 transition-colors ${view===viewName?'bg-indigo-50 dark:bg-indigo-950 text-baby-prime':'text-slate-400 dark:text-slate-600'}`}>
-                    <IconComponent />
-                    <span className="text-[9px] font-bold uppercase tracking-widest">{viewName==='home'?'Ouvir':'Diário'}</span>
-                </button>
+            if (loading) return (
+                <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600"></div>
+                </div>
             );
 
-            // Interface
             if (!user) return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
-                    <div className="baby-btn-grad p-6 rounded-[2.5rem] shadow-2xl shadow-indigo-200 mb-10"><IconBaby size={56} color="white"/></div>
-                    <Card className="w-full max-w-sm space-y-6">
-                        <div className="text-center">
-                            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tighter">BabyCry AI</h1>
-                            <p className="text-slate-500 text-sm mt-1">A IA que traduz o choro real do seu bebê.</p>
-                        </div>
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div className="relative">
-                                <span className="absolute left-4 top-4 text-slate-400"><Icon mail d={iMail} size={18}/></span>
-                                <input type="email" placeholder="Seu melhor e-mail" className="w-full pl-12 p-4 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none dark:text-white" onChange={e=>setAuthData({...authData, email:e.target.value})} required />
-                            </div>
-                            <div className="relative">
-                                <span className="absolute left-4 top-4 text-slate-400"><Icon lock d={iLock} size={18}/></span>
-                                <input type="password" placeholder="Senha segura" className="w-full pl-12 p-4 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none dark:text-white" onChange={e=>setAuthData({...authData, password:e.target.value})} required />
-                            </div>
-                            <button className="w-full py-4 baby-btn-grad text-white rounded-xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all text-sm">
-                                {loading ? "Acessando..." : "Entrar / Cadastrar"}
-                            </button>
-                        </form>
-                    </Card>
+                <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-white">
+                    <div className="baby-gradient p-6 rounded-[2.5rem] shadow-2xl mb-10"><Icon d={paths.baby} size={48} className="text-white"/></div>
+                    <h1 className="text-4xl font-black text-slate-800 tracking-tighter mb-2">BabyCry AI</h1>
+                    <p class="text-slate-400 text-sm mb-10 text-center">A tradução real para o choro do seu bebé.</p>
+                    
+                    <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
+                        <input type="email" placeholder="E-mail" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setEmail(e.target.value)} required />
+                        <input type="password" placeholder="Senha" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setPassword(e.target.value)} required />
+                        <button className="w-full py-5 baby-gradient text-white rounded-2xl font-black shadow-xl shadow-indigo-100 active:scale-95 transition-all uppercase tracking-widest text-xs">Entrar / Criar Conta</button>
+                    </form>
                 </div>
             );
 
             return (
-                <div className="min-h-screen max-w-md mx-auto bg-slate-50 dark:bg-slate-950 flex flex-col shadow-2xl relative">
-                    <header className="p-5 flex justify-between items-center glass sticky top-0 z-20 border-b-0 rounded-b-3xl">
-                        <div className="flex items-center gap-2.5 font-extrabold text-xl text-slate-900 dark:text-white tracking-tighter">
-                            <IconBaby size={26}/>
-                            <span>{appSettings.babyName || "BabyCry AI"}</span>
+                <div className={`min-h-screen max-w-md mx-auto flex flex-col transition-colors ${config.darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+                    {/* Header Premium */}
+                    <header className={`p-6 flex justify-between items-center sticky top-0 z-20 ${config.darkMode ? 'dark-glass' : 'glass'} border-b-0 rounded-b-[2.5rem]`}>
+                        <div className="flex items-center gap-3 font-black text-xl tracking-tighter">
+                            <Icon d={paths.baby} className="text-indigo-600" />
+                            <span>{config.babyName}</span>
                         </div>
-                        <div className="flex gap-1.5">
-                            <button onClick={()=>setView('donate')} className="p-2.5 rounded-full text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950 transition-colors"><IconHeart/></button>
-                            <button onClick={()=>setView('settings')} className="p-2.5 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><IconSettings/></button>
+                        <div className="flex gap-2">
+                            <button onClick={()=>setView('donate')} className="p-2 text-pink-500"><Icon d={paths.heart} size={22}/></button>
+                            <button onClick={()=>setView('settings')} className="p-2 text-slate-400"><Icon d={paths.settings} size={22}/></button>
                         </div>
                     </header>
 
-                    <main className="flex-1 p-6 space-y-10 pb-28">
+                    {/* Conteúdo Principal */}
+                    <main className="flex-1 p-6 space-y-10 pb-32">
                         {view === 'home' && (
-                            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12">
+                            <div className="flex flex-col items-center justify-center min-h-[65vh] space-y-12">
                                 <div className="relative">
                                     <button 
-                                        onClick={startAnalysis}
-                                        className={`w-56 h-56 rounded-full flex flex-col items-center justify-center transition-all ${isRecording ? 'bg-red-500 record-pulse scale-105' : 'baby-btn-grad shadow-3xl shadow-indigo-100 pulse-soft'}`}
+                                        onClick={translateCry}
+                                        className={`w-52 h-52 rounded-full flex flex-col items-center justify-center transition-all duration-500 ${isRecording ? 'bg-red-500 record-pulse scale-110' : 'baby-gradient shadow-[0_20px_50px_rgba(99,102,241,0.3)] active:scale-90'}`}
                                     >
-                                        <div className="text-white scale-125 mb-1"><IconMic size={32}/></div>
-                                        <span className="text-white text-[11px] font-black uppercase tracking-[0.2em]">
-                                            {isRecording ? "Ouvindo" : "Traduzir"}
-                                        </span>
+                                        <Icon d={paths.mic} size={40} className="text-white mb-2" />
+                                        <span className="text-white text-[10px] font-black uppercase tracking-[0.2em]">{isRecording ? "Ouvindo" : "Traduzir"}</span>
                                     </button>
                                 </div>
                                 
-                                {isAnalyzing && <p className="text-baby-prime font-bold animate-pulse text-sm">Consultando IA especializada...</p>}
+                                {isAnalyzing && <p className="text-indigo-600 font-black text-xs uppercase tracking-widest animate-pulse">Análise Bioacústica em curso...</p>}
                                 
                                 {result && (
-                                    <div className="w-full p-8 baby-btn-grad text-white rounded-[2.5rem] shadow-xl animate-in">
-                                        <h2 className="text-5xl font-black mb-3 tracking-tighter">{result.causa}</h2>
-                                        <p className="font-semibold opacity-90 leading-relaxed text-sm bg-black/10 p-5 rounded-2xl">{result.sugestao}</p>
+                                    <div className="w-full p-8 baby-gradient text-white rounded-[3rem] shadow-2xl animate-in">
+                                        <h3 className="text-5xl font-black mb-4 tracking-tighter leading-none">{result.causa}</h3>
+                                        <div className="bg-black/10 p-5 rounded-2xl border border-white/10">
+                                            <p className="font-bold text-sm leading-tight">{result.sugestao}</p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         )}
-                        
+
                         {view === 'history' && (
                             <div className="space-y-4 animate-in">
-                                <h2 className="text-3xl font-extrabold mb-8 dark:text-white tracking-tighter">Diário de Choro</h2>
-                                {history.length === 0 && <p className="text-center text-slate-400 py-16 text-sm">Nenhuma tradução registrada.</p>}
+                                <h2 className="text-3xl font-black tracking-tighter mb-8">Diário</h2>
+                                {history.length === 0 && <p className="text-center text-slate-400 py-20 font-bold uppercase text-[10px] tracking-widest">Nenhum registo</p>}
                                 {history.map(h => (
-                                    <Card key={h.id} className="flex justify-between items-center gap-4">
-                                        <div>
-                                            <p className="font-extrabold text-slate-900 dark:text-white text-lg tracking-tight">{h.causa}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{h.createdAt?.toDate().toLocaleString('pt-BR')}</p>
+                                    <div key={h.id} className={`p-5 rounded-[1.5rem] flex justify-between items-center ${config.darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-1 h-10 bg-indigo-500 rounded-full" />
+                                            <div>
+                                                <p className="font-black text-lg leading-none mb-1">{h.causa}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{h.createdAt?.toDate().toLocaleTimeString()}</p>
+                                            </div>
                                         </div>
-                                        <button onClick={()=>db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history").doc(h.id).delete()} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
-                                    </Card>
+                                        <button onClick={()=>db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history").doc(h.id).delete()} className="text-slate-200 hover:text-red-500 transition-colors"><Icon d={paths.trash} size={18}/></button>
+                                    </div>
                                 ))}
                             </div>
                         )}
 
                         {view === 'donate' && (
-                            <div className="text-center space-y-10 py-8 animate-in">
-                                <Heart size={64} className="mx-auto text-pink-500 fill-pink-500 drop-shadow-lg"/>
-                                <div>
-                                    <h2 className="text-3xl font-extrabold dark:text-white tracking-tighter">Apoie o Projeto</h2>
-                                    <p className="text-slate-500 text-sm mt-1 max-w-xs mx-auto">Sua contribuição ajuda a manter a IA gratuita e sem anúncios para todos.</p>
-                                </div>
-                                <div className="p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-pink-100 dark:border-pink-900 shadow-xl shadow-pink-50/50 dark:shadow-none">
-                                    <p className="text-[11px] font-black uppercase text-pink-500 mb-3 tracking-[0.2em]">Chave Pix (Copia e Cola)</p>
-                                    <p className="text-2xl font-mono font-black text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-950 p-5 rounded-xl border border-dashed border-pink-200 dark:border-pink-800">22992614433</p>
-                                    <button onClick={copyPix} className={`mt-6 w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2.5 transition-all text-sm ${copied ? 'bg-green-500 text-white' : 'bg-slate-950 dark:bg-white dark:text-slate-950 text-white active:scale-95'}`}>
-                                        {copied ? <IconCheck size={18}/> : <IconCopy size={18}/>} {copied ? 'Copiado!' : 'Copiar Chave Pix'}
+                            <div className="text-center py-10 space-y-8 animate-in">
+                                <Icon d={paths.heart} size={64} className="mx-auto text-pink-500 animate-bounce" />
+                                <h2 className="text-4xl font-black tracking-tighter">Apoie o Projeto</h2>
+                                <p className="text-slate-500 text-sm px-4">Contribua para manter a tradução gratuita para todos os pais.</p>
+                                <div className={`p-8 rounded-[2.5rem] border-2 border-dashed ${config.darkMode ? 'bg-slate-900 border-indigo-900' : 'bg-white border-indigo-100 shadow-xl shadow-indigo-50'}`}>
+                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest block mb-3">Chave Pix</span>
+                                    <div className={`p-5 rounded-2xl font-mono font-black text-xl mb-6 ${config.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>22992614433</div>
+                                    <button onClick={copyPix} className={`w-full py-5 rounded-2xl font-black flex items-center justify-center gap-3 transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-900 text-white active:scale-95'}`}>
+                                        <Icon d={copied ? paths.check : paths.copy} size={20} />
+                                        {copied ? "Copiado!" : "Copiar Chave"}
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {view === 'settings' && (
-                           <div className="space-y-8 animate-in">
-                               <h2 className="text-3xl font-extrabold dark:text-white tracking-tighter">Configurações</h2>
-                               <Card className="space-y-6">
-                                   <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider">Perfil do Bebê</h3>
-                                   <Input type="text" placeholder="Nome do Bebê" value={appSettings.babyName} onChange={e=>setAppSettings({...appSettings, babyName: e.target.value})} />
-                                   <Input type="date" value={appSettings.babyDob} onChange={e=>setAppSettings({...appSettings, babyDob: e.target.value})} />
-                               </Card>
-                               
-                          
+                            <div className="space-y-6 animate-in">
+                                <h2 className="text-3xl font-black tracking-tighter mb-8">Ajustes</h2>
+                                <div className={`p-8 rounded-[2.5rem] space-y-8 ${config.darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
+                                    <div className="space-y-4">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nome do Bebé</label>
+                                        <input type="text" value={config.babyName} className="w-full bg-transparent border-b-2 border-slate-100 dark:border-slate-800 p-2 font-bold outline-none" onChange={e=>setConfig({...config, babyName: e.target.value})} />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold">Modo Escuro</span>
+                                        <button onClick={()=>setConfig({...config, darkMode: !config.darkMode})} className={`w-14 h-8 rounded-full transition-colors relative ${config.darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${config.darkMode ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+                                    <hr className="border-slate-100 dark:border-slate-800" />
+                                    <button onClick={()=>auth.signOut()} className="w-full py-4 text-red-500 font-black uppercase text-xs tracking-widest border border-red-50 dark:border-red-900 rounded-2xl"><Icon d={paths.logout} size={16} className="inline mr-2" /> Sair da Conta</button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Tab Bar Flutuante */}
+                    <nav className={`fixed bottom-6 left-6 right-6 p-2 rounded-[2rem] flex justify-around shadow-2xl z-30 ${config.darkMode ? 'dark-glass' : 'glass shadow-indigo-100/50'}`}>
+                        <button onClick={()=>setView('home')} className={`p-4 rounded-2xl transition-all ${view==='home'?'bg-indigo-600 text-white shadow-lg':'text-slate-300'}`}><Icon d={paths.mic}/></button>
+                        <button onClick={()=>setView('history')} className={`p-4 rounded-2xl transition-all ${view==='history'?'bg-indigo-600 text-white shadow-lg':'text-slate-300'}`}><Icon d={paths.history}/></button>
+                    </nav>
+                </div>
+            );
+        };
+
+        // Renderização Inicial
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
 
