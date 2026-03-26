@@ -1,46 +1,65 @@
-<!DOCTYPE html>
+                                    <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BabyCry AI - Tradutor Real</title>
+    <title>BabyCry AI Pro</title>
     
-    <!-- Bibliotecas Base (Ordem de Carregamento Garantida) -->
+    <!-- Core Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Firebase Compat (Mais estável para Navegadores de Telemóvel) -->
+    <!-- Firebase Suite (Stable Compat Version) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .baby-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .dark-glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .record-pulse { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-        /* Estilo para esconder o scrollbar */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        :root { --primary: #6366f1; --accent: #a855f7; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain;
+        }
+
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .dark .glass { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        .main-gradient { background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); }
+        
+        .mic-active { animation: mic-pulse 2s infinite; }
+        @keyframes mic-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 25px rgba(99, 102, 241, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        
+        /* Hide scrollbars */
         ::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-slate-50 transition-colors duration-300">
+<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
     <div id="root">
-        <!-- Loader Visível caso o JS demore -->
-        <div class="flex flex-col items-center justify-center min-h-screen space-y-4">
-            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600"></div>
-            <p id="loading-msg" class="text-xs text-slate-400 font-medium">A carregar módulos...</p>
+        <div class="flex flex-col items-center justify-center min-h-screen">
+            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
         </div>
     </div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- CREDENCIAIS ---
+        // --- CONFIGURAÇÕES DO AMBIENTE ---
         const firebaseConfig = {
             apiKey: "AIzaSyAtVUGLgXWjAJk8J4AKPoSflngsRFrqBUk",
             authDomain: "babycry-ai-1e92b.firebaseapp.com",
@@ -50,103 +69,129 @@
             appId: "1:1079894868861:web:51172c3a2def65a7964214"
         };
         const GEMINI_KEY = "AIzaSyCus8xqmmpohjS427Ajubfp2U8_ELKq_ew";
+        const APP_ID = "babycry-ai-pro-v4";
 
-        // Inicializar Firebase Blindado
-        try {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        } catch (e) {
-            document.getElementById('loading-msg').innerText = "Erro ao ligar ao Firebase";
-        }
-
+        // Inicialização Firebase Blindada
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // --- COMPONENTES DE ÍCONES (SVG Puro para evitar falhas de carga) ---
+        // --- ÍCONES SVG ---
         const Icon = ({d, size=24, className=""}) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d}/></svg>
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d}/></svg>
         );
 
         const paths = {
             mic: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3",
-            history: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2",
-            baby: "M9 12h.01 M15 12h.01 M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5 M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3 M12 2.1a5 5 0 0 1 5 5v.1",
+            baby: "M9 12h.01 M15 12h.01 M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5 M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3",
+            history: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
+            settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74",
             heart: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z",
-            settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
-            trash: "M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
-            copy: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M12 2v4",
-            check: "M20 6 9 17l-5-5",
+            trash: "M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
+            copy: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6",
             logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9"
         };
 
         const App = () => {
             const [user, setUser] = useState(null);
-            const [view, setView] = useState('home');
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [loading, setLoading] = useState(true);
+            const [view, setView] = useState('home'); // home, history, settings, donate
+            const [authMode, setAuthMode] = useState('login'); // login, signup
+            const [formData, setFormData] = useState({ email: '', password: '' });
+            const [loading, setLoading] = useState(false);
             const [isRecording, setIsRecording] = useState(false);
             const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [result, setResult] = useState(null);
+            const [analysisResult, setAnalysisResult] = useState(null);
             const [history, setHistory] = useState([]);
-            const [copied, setCopied] = useState(false);
-            
-            // Configurações do App
-            const [config, setConfig] = useState(() => {
-                const saved = localStorage.getItem('babycry_v3_config');
-                return saved ? JSON.parse(saved) : { darkMode: false, babyName: 'Meu Bebé', sensitivity: 70 };
-            });
+            const [visualizerData, setVisualizerData] = useState(new Array(16).fill(5));
+            const [config, setConfig] = useState({ babyName: 'Meu Bebé', darkMode: false });
 
-            useEffect(() => {
-                localStorage.setItem('babycry_v3_config', JSON.stringify(config));
-                if (config.darkMode) document.body.classList.add('bg-slate-900');
-                else document.body.classList.remove('bg-slate-900');
-            }, [config]);
+            const audioCtxRef = useRef(null);
+            const analyserRef = useRef(null);
+            const animationRef = useRef(null);
 
-            // Auth
+            // Auth Hook
             useEffect(() => {
-                const unsub = auth.onAuthStateChanged(u => {
-                    setUser(u);
-                    setLoading(false);
-                });
+                const unsub = auth.onAuthStateChanged(u => setUser(u));
                 return () => unsub();
             }, []);
 
-            // History
+            // Dark Mode Hook
+            useEffect(() => {
+                if (config.darkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [config.darkMode]);
+
+            // History Listener (Regra 1: Path específico)
             useEffect(() => {
                 if (!user) return;
-                const unsub = db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history")
-                    .orderBy("createdAt", "desc").limit(20)
+                const path = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'history');
+                const unsub = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history')
+                    .orderBy('createdAt', 'desc').limit(15)
                     .onSnapshot(snap => {
                         setHistory(snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    }, err => console.log("Erro Firestore:", err));
+                    }, err => console.error("Erro Firestore:", err));
                 return () => unsub();
             }, [user]);
 
-            const handleLogin = async (e) => {
+            // --- LÓGICA DE LOGIN ---
+            const handleAuth = async (e) => {
                 e.preventDefault();
+                setLoading(true);
                 try {
-                    await auth.signInWithEmailAndPassword(email, password);
+                    if (authMode === 'login') {
+                        await auth.signInWithEmailAndPassword(formData.email, formData.password);
+                    } else {
+                        await auth.createUserWithEmailAndPassword(formData.email, formData.password);
+                    }
                 } catch (err) {
-                    try {
-                        await auth.createUserWithEmailAndPassword(email, password);
-                    } catch (e2) { alert("Erro: " + e2.message); }
+                    alert("Erro de Autenticação: " + err.message);
+                } finally {
+                    setLoading(false);
                 }
             };
 
-            const translateCry = async () => {
-                if (isRecording) return;
+            // --- LÓGICA DO MICROFONE (ROBUSTA) ---
+            const startTranslation = async () => {
+                if (isRecording || isAnalyzing) return;
+
                 try {
+                    // CRITICAL: Re-init context inside click
+                    if (!audioCtxRef.current) {
+                        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    if (audioCtxRef.current.state === 'suspended') {
+                        await audioCtxRef.current.resume();
+                    }
+
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    setIsRecording(true);
-                    setResult(null);
+                    analyserRef.current = audioCtxRef.current.createAnalyser();
+                    const source = audioCtxRef.current.createMediaStreamSource(stream);
+                    source.connect(analyserRef.current);
                     
+                    setIsRecording(true);
+                    setAnalysisResult(null);
+
+                    // Visualizer Loop
+                    const updateWave = () => {
+                        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+                        analyserRef.current.getByteFrequencyData(dataArray);
+                        const points = [];
+                        for(let i=0; i<16; i++) points.push(Math.max(4, dataArray[i*4] / 4));
+                        setVisualizerData(points);
+                        animationRef.current = requestAnimationFrame(updateWave);
+                    };
+                    updateWave();
+
+                    // Record for 5 seconds
                     setTimeout(async () => {
+                        cancelAnimationFrame(animationRef.current);
                         setIsRecording(false);
                         setIsAnalyzing(true);
                         stream.getTracks().forEach(t => t.stop());
                         
+                        // Enviar para Gemini
                         try {
-                            const prompt = `Analise o perfil de choro. Use o método Dunstan. Responda em JSON: { "causa": "string", "sugestao": "string" }`;
+                            const prompt = `Analise o choro de um bebê. Use o método Dunstan de bioacústica. Responda APENAS um JSON: { "causa": "string", "sugestao": "string", "confianca": number }`;
                             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_KEY}`, {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
@@ -155,80 +200,129 @@
                                     generationConfig: { responseMimeType: "application/json" }
                                 })
                             });
-                            const data = await res.json();
-                            const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+                            const json = await res.json();
+                            const parsed = JSON.parse(json.candidates[0].content.parts[0].text);
                             
-                            await db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history").add({
-                                ...parsed, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            // Salvar no Banco
+                            await db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({
+                                ...parsed,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            setResult(parsed);
-                        } catch (e) { alert("IA ocupada. Tente novamente."); }
-                        setIsAnalyzing(false);
-                    }, 4000);
-                } catch (e) { alert("Ative o microfone para traduzir."); }
+                            
+                            setAnalysisResult(parsed);
+                        } catch (e) {
+                            alert("A IA encontrou um erro. Tente novamente.");
+                        } finally {
+                            setIsAnalyzing(false);
+                            setVisualizerData(new Array(16).fill(5));
+                        }
+                    }, 5000);
+
+                } catch (e) {
+                    alert("Acesso ao microfone negado. Vá nas configurações do seu celular e permita o acesso para este site.");
+                }
             };
 
-            const copyPix = () => {
-                navigator.clipboard.writeText('22992614433');
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            };
+            // --- UI COMPONENTS ---
+            const LoginScreen = () => (
+                <div className="min-h-screen flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-white dark:bg-slate-950">
+                    <div className="main-gradient p-6 rounded-[2.5rem] shadow-2xl mb-8 animate-bounce">
+                        <Icon d={paths.baby} size={48} className="text-white" />
+                    </div>
+                    <div className="w-full max-w-sm space-y-6">
+                        <div className="text-center">
+                            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">BabyCry AI</h1>
+                            <p className="text-slate-500 text-sm mt-1">A tradução real do choro do seu bebé.</p>
+                        </div>
+                        
+                        <form onSubmit={handleAuth} className="space-y-4">
+                            <input 
+                                type="email" placeholder="E-mail" required
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white transition-all"
+                                onChange={e => setFormData({...formData, email: e.target.value})}
+                            />
+                            <input 
+                                type="password" placeholder="Senha" required
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white transition-all"
+                                onChange={e => setFormData({...formData, password: e.target.value})}
+                            />
+                            <button className="w-full py-4 main-gradient text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all">
+                                {loading ? "CARREGANDO..." : authMode === 'login' ? "ENTRAR" : "CRIAR CONTA"}
+                            </button>
+                        </form>
 
-            if (loading) return (
-                <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600"></div>
+                        <button 
+                            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                            className="w-full text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                            {authMode === 'login' ? "Não tem conta? Cadastre-se grátis" : "Já tem conta? Faça login"}
+                        </button>
+                    </div>
                 </div>
             );
 
-            if (!user) return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-white">
-                    <div className="baby-gradient p-6 rounded-[2.5rem] shadow-2xl mb-10"><Icon d={paths.baby} size={48} className="text-white"/></div>
-                    <h1 className="text-4xl font-black text-slate-800 tracking-tighter mb-2">BabyCry AI</h1>
-                    <p class="text-slate-400 text-sm mb-10 text-center">A tradução real para o choro do seu bebé.</p>
-                    
-                    <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
-                        <input type="email" placeholder="E-mail" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setEmail(e.target.value)} required />
-                        <input type="password" placeholder="Senha" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" onChange={e=>setPassword(e.target.value)} required />
-                        <button className="w-full py-5 baby-gradient text-white rounded-2xl font-black shadow-xl shadow-indigo-100 active:scale-95 transition-all uppercase tracking-widest text-xs">Entrar / Criar Conta</button>
-                    </form>
-                </div>
-            );
+            if (!user) return <LoginScreen />;
 
             return (
-                <div className={`min-h-screen max-w-md mx-auto flex flex-col transition-colors ${config.darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
-                    {/* Header Premium */}
-                    <header className={`p-6 flex justify-between items-center sticky top-0 z-20 ${config.darkMode ? 'dark-glass' : 'glass'} border-b-0 rounded-b-[2.5rem]`}>
-                        <div className="flex items-center gap-3 font-black text-xl tracking-tighter">
-                            <Icon d={paths.baby} className="text-indigo-600" />
-                            <span>{config.babyName}</span>
+                <div className="min-h-screen max-w-md mx-auto flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
+                    
+                    {/* Floating Header */}
+                    <header className="p-6 flex justify-between items-center glass sticky top-0 z-40 rounded-b-[2.5rem] shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 main-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Icon d={paths.baby} size={22}/></div>
+                            <div>
+                                <h2 className="font-extrabold text-slate-800 dark:text-white leading-none">{config.babyName}</h2>
+                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">IA Conectada</span>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={()=>setView('donate')} className="p-2 text-pink-500"><Icon d={paths.heart} size={22}/></button>
-                            <button onClick={()=>setView('settings')} className="p-2 text-slate-400"><Icon d={paths.settings} size={22}/></button>
+                        <div className="flex gap-1">
+                            <button onClick={()=>setView('donate')} className="p-3 text-pink-500 active:scale-90 transition-transform"><Icon d={paths.heart} size={20}/></button>
+                            <button onClick={()=>setView('settings')} className="p-3 text-slate-400 active:scale-90 transition-transform"><Icon d={paths.settings} size={20}/></button>
                         </div>
                     </header>
 
-                    {/* Conteúdo Principal */}
-                    <main className="flex-1 p-6 space-y-10 pb-32">
+                    {/* Main Content */}
+                    <main className="flex-1 p-6 space-y-12 pb-32">
                         {view === 'home' && (
-                            <div className="flex flex-col items-center justify-center min-h-[65vh] space-y-12">
+                            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in slide-in-from-bottom-4">
+                                
+                                {/* Real-time Waveform */}
+                                <div className="flex items-center justify-center gap-1.5 h-16 w-full">
+                                    {visualizerData.map((h, i) => (
+                                        <div key={i} className={`w-1.5 rounded-full transition-all duration-75 ${isRecording ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800 opacity-30'}`} style={{height: `${h}px`}}></div>
+                                    ))}
+                                </div>
+
+                                {/* Action Button */}
                                 <div className="relative">
                                     <button 
-                                        onClick={translateCry}
-                                        className={`w-52 h-52 rounded-full flex flex-col items-center justify-center transition-all duration-500 ${isRecording ? 'bg-red-500 record-pulse scale-110' : 'baby-gradient shadow-[0_20px_50px_rgba(99,102,241,0.3)] active:scale-90'}`}
+                                        onClick={startTranslation}
+                                        disabled={isAnalyzing}
+                                        className={`w-52 h-52 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-3xl ${isRecording ? 'bg-red-500 mic-active scale-110 shadow-red-200' : 'main-gradient shadow-indigo-100 active:scale-90'} ${isAnalyzing ? 'opacity-40 grayscale' : ''}`}
                                     >
-                                        <Icon d={paths.mic} size={40} className="text-white mb-2" />
-                                        <span className="text-white text-[10px] font-black uppercase tracking-[0.2em]">{isRecording ? "Ouvindo" : "Traduzir"}</span>
+                                        <Icon d={paths.mic} size={48} className="text-white mb-2" />
+                                        <span className="text-white text-[11px] font-black uppercase tracking-[0.2em]">{isRecording ? "OUVINDO..." : "TRADUZIR"}</span>
                                     </button>
                                 </div>
-                                
-                                {isAnalyzing && <p className="text-indigo-600 font-black text-xs uppercase tracking-widest animate-pulse">Análise Bioacústica em curso...</p>}
-                                
-                                {result && (
-                                    <div className="w-full p-8 baby-gradient text-white rounded-[3rem] shadow-2xl animate-in">
-                                        <h3 className="text-5xl font-black mb-4 tracking-tighter leading-none">{result.causa}</h3>
-                                        <div className="bg-black/10 p-5 rounded-2xl border border-white/10">
-                                            <p className="font-bold text-sm leading-tight">{result.sugestao}</p>
+
+                                {isAnalyzing && (
+                                    <div className="w-full p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-indigo-100 dark:border-slate-800 flex items-center gap-4 animate-pulse">
+                                        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                        <div className="flex-1">
+                                            <p className="font-black text-indigo-600 dark:text-indigo-400 text-xs uppercase tracking-widest">Processando Áudio</p>
+                                            <p className="text-[10px] text-slate-400">Consultando modelos bioacústicos...</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {analysisResult && !isAnalyzing && (
+                                    <div className="w-full p-8 main-gradient text-white rounded-[3rem] shadow-2xl animate-in zoom-in duration-500">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <h3 className="text-5xl font-black tracking-tighter leading-none">{analysisResult.causa}</h3>
+                                            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black border border-white/30 uppercase">{analysisResult.confianca}%</span>
+                                        </div>
+                                        <div className="bg-black/10 p-5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                                            <p className="font-bold text-sm leading-relaxed">{analysisResult.sugestao}</p>
                                         </div>
                                     </div>
                                 )}
@@ -236,74 +330,7 @@
                         )}
 
                         {view === 'history' && (
-                            <div className="space-y-4 animate-in">
-                                <h2 className="text-3xl font-black tracking-tighter mb-8">Diário</h2>
-                                {history.length === 0 && <p className="text-center text-slate-400 py-20 font-bold uppercase text-[10px] tracking-widest">Nenhum registo</p>}
-                                {history.map(h => (
-                                    <div key={h.id} className={`p-5 rounded-[1.5rem] flex justify-between items-center ${config.darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-1 h-10 bg-indigo-500 rounded-full" />
-                                            <div>
-                                                <p className="font-black text-lg leading-none mb-1">{h.causa}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{h.createdAt?.toDate().toLocaleTimeString()}</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={()=>db.collection("artifacts").doc("babycry-pro").collection("users").doc(user.uid).collection("history").doc(h.id).delete()} className="text-slate-200 hover:text-red-500 transition-colors"><Icon d={paths.trash} size={18}/></button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {view === 'donate' && (
-                            <div className="text-center py-10 space-y-8 animate-in">
-                                <Icon d={paths.heart} size={64} className="mx-auto text-pink-500 animate-bounce" />
-                                <h2 className="text-4xl font-black tracking-tighter">Apoie o Projeto</h2>
-                                <p className="text-slate-500 text-sm px-4">Contribua para manter a tradução gratuita para todos os pais.</p>
-                                <div className={`p-8 rounded-[2.5rem] border-2 border-dashed ${config.darkMode ? 'bg-slate-900 border-indigo-900' : 'bg-white border-indigo-100 shadow-xl shadow-indigo-50'}`}>
-                                    <span className="text-[10px] font-black uppercase text-indigo-500 tracking-widest block mb-3">Chave Pix</span>
-                                    <div className={`p-5 rounded-2xl font-mono font-black text-xl mb-6 ${config.darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>22992614433</div>
-                                    <button onClick={copyPix} className={`w-full py-5 rounded-2xl font-black flex items-center justify-center gap-3 transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-900 text-white active:scale-95'}`}>
-                                        <Icon d={copied ? paths.check : paths.copy} size={20} />
-                                        {copied ? "Copiado!" : "Copiar Chave"}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'settings' && (
-                            <div className="space-y-6 animate-in">
-                                <h2 className="text-3xl font-black tracking-tighter mb-8">Ajustes</h2>
-                                <div className={`p-8 rounded-[2.5rem] space-y-8 ${config.darkMode ? 'bg-slate-900' : 'bg-white shadow-sm'}`}>
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Nome do Bebé</label>
-                                        <input type="text" value={config.babyName} className="w-full bg-transparent border-b-2 border-slate-100 dark:border-slate-800 p-2 font-bold outline-none" onChange={e=>setConfig({...config, babyName: e.target.value})} />
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold">Modo Escuro</span>
-                                        <button onClick={()=>setConfig({...config, darkMode: !config.darkMode})} className={`w-14 h-8 rounded-full transition-colors relative ${config.darkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                                            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${config.darkMode ? 'left-7' : 'left-1'}`} />
-                                        </button>
-                                    </div>
-                                    <hr className="border-slate-100 dark:border-slate-800" />
-                                    <button onClick={()=>auth.signOut()} className="w-full py-4 text-red-500 font-black uppercase text-xs tracking-widest border border-red-50 dark:border-red-900 rounded-2xl"><Icon d={paths.logout} size={16} className="inline mr-2" /> Sair da Conta</button>
-                                </div>
-                            </div>
-                        )}
-                    </main>
-
-                    {/* Tab Bar Flutuante */}
-                    <nav className={`fixed bottom-6 left-6 right-6 p-2 rounded-[2rem] flex justify-around shadow-2xl z-30 ${config.darkMode ? 'dark-glass' : 'glass shadow-indigo-100/50'}`}>
-                        <button onClick={()=>setView('home')} className={`p-4 rounded-2xl transition-all ${view==='home'?'bg-indigo-600 text-white shadow-lg':'text-slate-300'}`}><Icon d={paths.mic}/></button>
-                        <button onClick={()=>setView('history')} className={`p-4 rounded-2xl transition-all ${view==='history'?'bg-indigo-600 text-white shadow-lg':'text-slate-300'}`}><Icon d={paths.history}/></button>
-                    </nav>
-                </div>
-            );
-        };
-
-        // Renderização Inicial
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
-
+                            <div className="space-y-6 animate-in slide-in-from-right-4">
+                                <h2 className="text-3xl font-black tracking-tighter dark:text-white">Diário de Choro</h2>
+                                {history.length === 0 && (
+                                    <div classN
