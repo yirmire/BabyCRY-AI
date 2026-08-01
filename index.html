@@ -1,336 +1,147 @@
-                                    <!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BabyCry AI Pro</title>
-    
-    <!-- Core Libraries -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase Suite (Stable Compat Version) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        
-        :root { --primary: #6366f1; --accent: #a855f7; }
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            -webkit-tap-highlight-color: transparent;
-            overscroll-behavior-y: contain;
-        }
-
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .dark .glass { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
-        
-        .main-gradient { background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); }
-        
-        .mic-active { animation: mic-pulse 2s infinite; }
-        @keyframes mic-pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 25px rgba(99, 102, 241, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
-        }
-
-        .shimmer {
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-        }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        
-        /* Hide scrollbars */
-        ::-webkit-scrollbar { display: none; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#6558d3" />
+  <meta name="description" content="Assistente de cuidado que registra e organiza hipóteses sobre o choro do bebê." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>BabyCry AI Care</title>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-    <div id="root">
-        <div class="flex flex-col items-center justify-center min-h-screen">
-            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <div class="app-shell">
+    <header class="topbar glass">
+      <button class="brand" data-view-target="home" aria-label="Ir para o início">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8c0-1.72-.54-3.32-1.46-4.63A4.5 4.5 0 0 0 14.5 1a4.48 4.48 0 0 0-4.1 2.66A7.96 7.96 0 0 0 12 4Z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/><path d="M9.5 15c.7.6 1.53.9 2.5.9s1.8-.3 2.5-.9"/></svg>
+        </span>
+        <span>
+          <strong id="headerBabyName">Meu bebê</strong>
+          <small><i class="status-dot"></i> cuidado assistido</small>
+        </span>
+      </button>
+      <button id="themeButton" class="icon-button" aria-label="Alternar tema" title="Alternar tema">
+        <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+    </header>
+
+    <main>
+      <section id="view-home" class="view active" aria-labelledby="homeTitle">
+        <div class="hero-copy">
+          <span class="eyebrow">Escute, registre, observe</span>
+          <h1 id="homeTitle">Uma hipótese de cuidado, não um diagnóstico.</h1>
+          <p>Grave alguns segundos do choro em um ambiente silencioso. A análise pode ajudar a organizar possibilidades, mas não substitui avaliação clínica.</p>
         </div>
-    </div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        <div class="recorder-card glass">
+          <div class="record-meta">
+            <span id="recordStatus">Pronto para ouvir</span>
+            <strong id="countdown">10s</strong>
+          </div>
 
-        // --- CONFIGURAÇÕES DO AMBIENTE ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAtVUGLgXWjAJk8J4AKPoSflngsRFrqBUk",
-            authDomain: "babycry-ai-1e92b.firebaseapp.com",
-            projectId: "babycry-ai-1e92b",
-            storageBucket: "babycry-ai-1e92b.firebasestorage.app",
-            messagingSenderId: "1079894868861",
-            appId: "1:1079894868861:web:51172c3a2def65a7964214"
-        };
-        const GEMINI_KEY = "AIzaSyCus8xqmmpohjS427Ajubfp2U8_ELKq_ew";
-        const APP_ID = "babycry-ai-pro-v4";
+          <div id="visualizer" class="visualizer" aria-hidden="true"></div>
 
-        // Inicialização Firebase Blindada
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+          <button id="recordButton" class="record-button" type="button">
+            <span class="record-ring"></span>
+            <span class="record-core">
+              <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg>
+              <b id="recordButtonText">ANALISAR CHORO</b>
+              <small id="recordHint">toque para iniciar</small>
+            </span>
+          </button>
 
-        // --- ÍCONES SVG ---
-        const Icon = ({d, size=24, className=""}) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d}/></svg>
-        );
+          <p class="privacy-note">
+            <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            O áudio é enviado somente durante a análise e não é salvo por este projeto.
+          </p>
+        </div>
 
-        const paths = {
-            mic: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v3",
-            baby: "M9 12h.01 M15 12h.01 M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5 M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3",
-            history: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",
-            settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74",
-            heart: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z",
-            trash: "M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
-            copy: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6",
-            logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9"
-        };
+        <div id="analysisPanel" class="analysis-panel hidden" aria-live="polite"></div>
 
-        const App = () => {
-            const [user, setUser] = useState(null);
-            const [view, setView] = useState('home'); // home, history, settings, donate
-            const [authMode, setAuthMode] = useState('login'); // login, signup
-            const [formData, setFormData] = useState({ email: '', password: '' });
-            const [loading, setLoading] = useState(false);
-            const [isRecording, setIsRecording] = useState(false);
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [analysisResult, setAnalysisResult] = useState(null);
-            const [history, setHistory] = useState([]);
-            const [visualizerData, setVisualizerData] = useState(new Array(16).fill(5));
-            const [config, setConfig] = useState({ babyName: 'Meu Bebé', darkMode: false });
+        <button class="alert-card" data-view-target="guide" type="button">
+          <span class="alert-icon">!</span>
+          <span><b>Antes de analisar</b><small>Confira os sinais de alerta que exigem atendimento.</small></span>
+          <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </section>
 
-            const audioCtxRef = useRef(null);
-            const analyserRef = useRef(null);
-            const animationRef = useRef(null);
+      <section id="view-history" class="view" aria-labelledby="historyTitle">
+        <div class="section-heading">
+          <div><span class="eyebrow">Registro local</span><h2 id="historyTitle">Diário de choro</h2></div>
+          <button id="exportHistory" class="text-button" type="button">Exportar</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
 
-            // Auth Hook
-            useEffect(() => {
-                const unsub = auth.onAuthStateChanged(u => setUser(u));
-                return () => unsub();
-            }, []);
+      <section id="view-guide" class="view" aria-labelledby="guideTitle">
+        <div class="section-heading">
+          <div><span class="eyebrow">Segurança primeiro</span><h2 id="guideTitle">Guia rápido</h2></div>
+        </div>
 
-            // Dark Mode Hook
-            useEffect(() => {
-                if (config.darkMode) document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            }, [config.darkMode]);
+        <article class="danger-card">
+          <span class="danger-symbol">!</span>
+          <div>
+            <h3>Procure atendimento imediatamente</h3>
+            <p>Se houver dificuldade para respirar, pele ou lábios arroxeados/pálidos, convulsão, muita sonolência, dificuldade para acordar, recusa persistente de alimentação, vômitos repetidos ou choro inconsolável diferente do habitual.</p>
+            <a href="tel:192">Ligar para o SAMU 192</a>
+          </div>
+        </article>
 
-            // History Listener (Regra 1: Path específico)
-            useEffect(() => {
-                if (!user) return;
-                const path = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'history');
-                const unsub = db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history')
-                    .orderBy('createdAt', 'desc').limit(15)
-                    .onSnapshot(snap => {
-                        setHistory(snap.docs.map(d => ({id: d.id, ...d.data()})));
-                    }, err => console.error("Erro Firestore:", err));
-                return () => unsub();
-            }, [user]);
+        <div class="guide-grid">
+          <article><span>01</span><h3>Fome</h3><p>Procure sinais associados: busca pelo peito, mãos na boca e intervalo desde a última mamada.</p></article>
+          <article><span>02</span><h3>Arroto ou gases</h3><p>Observe arqueamento, pernas encolhidas e desconforto após a mamada.</p></article>
+          <article><span>03</span><h3>Sono</h3><p>Bocejos, olhar perdido, irritação crescente e dificuldade para se acalmar podem acompanhar o cansaço.</p></article>
+          <article><span>04</span><h3>Desconforto</h3><p>Cheque fralda, roupa apertada, temperatura, posição e excesso de estímulos.</p></article>
+        </div>
 
-            // --- LÓGICA DE LOGIN ---
-            const handleAuth = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                try {
-                    if (authMode === 'login') {
-                        await auth.signInWithEmailAndPassword(formData.email, formData.password);
-                    } else {
-                        await auth.createUserWithEmailAndPassword(formData.email, formData.password);
-                    }
-                } catch (err) {
-                    alert("Erro de Autenticação: " + err.message);
-                } finally {
-                    setLoading(false);
-                }
-            };
+        <article class="care-note">
+          <h3>Regra prática</h3>
+          <p>A análise do som isoladamente não identifica a causa com certeza. Combine o resultado com idade, alimentação, sono, temperatura, fralda, comportamento e orientação do pediatra.</p>
+        </article>
+      </section>
 
-            // --- LÓGICA DO MICROFONE (ROBUSTA) ---
-            const startTranslation = async () => {
-                if (isRecording || isAnalyzing) return;
+      <section id="view-settings" class="view" aria-labelledby="settingsTitle">
+        <div class="section-heading">
+          <div><span class="eyebrow">Personalização</span><h2 id="settingsTitle">Configurações</h2></div>
+        </div>
 
-                try {
-                    // CRITICAL: Re-init context inside click
-                    if (!audioCtxRef.current) {
-                        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-                    }
-                    if (audioCtxRef.current.state === 'suspended') {
-                        await audioCtxRef.current.resume();
-                    }
+        <form id="settingsForm" class="settings-card glass">
+          <label>Nome do bebê<input id="babyNameInput" maxlength="30" autocomplete="off" /></label>
+          <label>Idade em meses<input id="babyAgeInput" type="number" min="0" max="36" inputmode="numeric" /></label>
+          <label>Duração da gravação
+            <select id="durationInput"><option value="8">8 segundos</option><option value="10">10 segundos</option><option value="12">12 segundos</option></select>
+          </label>
+          <label>Endereço do backend<input id="apiUrlInput" type="url" placeholder="https://seu-worker.workers.dev/analyze" /></label>
+          <label class="switch-row"><span><b>Modo demonstração</b><small>Mostra um exemplo claramente identificado, sem usar IA.</small></span><input id="demoModeInput" type="checkbox" role="switch" /></label>
+          <button class="primary-button" type="submit">Salvar configurações</button>
+        </form>
 
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    analyserRef.current = audioCtxRef.current.createAnalyser();
-                    const source = audioCtxRef.current.createMediaStreamSource(stream);
-                    source.connect(analyserRef.current);
-                    
-                    setIsRecording(true);
-                    setAnalysisResult(null);
+        <div class="settings-actions">
+          <button id="installButton" class="secondary-button hidden" type="button">Instalar aplicativo</button>
+          <button id="clearHistory" class="danger-button" type="button">Apagar histórico</button>
+        </div>
 
-                    // Visualizer Loop
-                    const updateWave = () => {
-                        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-                        analyserRef.current.getByteFrequencyData(dataArray);
-                        const points = [];
-                        for(let i=0; i<16; i++) points.push(Math.max(4, dataArray[i*4] / 4));
-                        setVisualizerData(points);
-                        animationRef.current = requestAnimationFrame(updateWave);
-                    };
-                    updateWave();
+        <p class="version">BabyCry AI Care • PWA 1.0.0</p>
+      </section>
+    </main>
 
-                    // Record for 5 seconds
-                    setTimeout(async () => {
-                        cancelAnimationFrame(animationRef.current);
-                        setIsRecording(false);
-                        setIsAnalyzing(true);
-                        stream.getTracks().forEach(t => t.stop());
-                        
-                        // Enviar para Gemini
-                        try {
-                            const prompt = `Analise o choro de um bebê. Use o método Dunstan de bioacústica. Responda APENAS um JSON: { "causa": "string", "sugestao": "string", "confianca": number }`;
-                            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_KEY}`, {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({
-                                    contents: [{ parts: [{ text: prompt }] }],
-                                    generationConfig: { responseMimeType: "application/json" }
-                                })
-                            });
-                            const json = await res.json();
-                            const parsed = JSON.parse(json.candidates[0].content.parts[0].text);
-                            
-                            // Salvar no Banco
-                            await db.collection('artifacts').doc(APP_ID).collection('users').doc(user.uid).collection('history').add({
-                                ...parsed,
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            
-                            setAnalysisResult(parsed);
-                        } catch (e) {
-                            alert("A IA encontrou um erro. Tente novamente.");
-                        } finally {
-                            setIsAnalyzing(false);
-                            setVisualizerData(new Array(16).fill(5));
-                        }
-                    }, 5000);
+    <nav class="bottom-nav glass" aria-label="Navegação principal">
+      <button class="nav-item active" data-view-target="home"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg><span>Início</span></button>
+      <button class="nav-item" data-view-target="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Histórico</span></button>
+      <button class="nav-item" data-view-target="guide"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg><span>Guia</span></button>
+      <button class="nav-item" data-view-target="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.52-1H3v-4h.08A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.52 1H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Ajustes</span></button>
+    </nav>
+  </div>
 
-                } catch (e) {
-                    alert("Acesso ao microfone negado. Vá nas configurações do seu celular e permita o acesso para este site.");
-                }
-            };
-
-            // --- UI COMPONENTS ---
-            const LoginScreen = () => (
-                <div className="min-h-screen flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-white dark:bg-slate-950">
-                    <div className="main-gradient p-6 rounded-[2.5rem] shadow-2xl mb-8 animate-bounce">
-                        <Icon d={paths.baby} size={48} className="text-white" />
-                    </div>
-                    <div className="w-full max-w-sm space-y-6">
-                        <div className="text-center">
-                            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">BabyCry AI</h1>
-                            <p className="text-slate-500 text-sm mt-1">A tradução real do choro do seu bebé.</p>
-                        </div>
-                        
-                        <form onSubmit={handleAuth} className="space-y-4">
-                            <input 
-                                type="email" placeholder="E-mail" required
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white transition-all"
-                                onChange={e => setFormData({...formData, email: e.target.value})}
-                            />
-                            <input 
-                                type="password" placeholder="Senha" required
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white transition-all"
-                                onChange={e => setFormData({...formData, password: e.target.value})}
-                            />
-                            <button className="w-full py-4 main-gradient text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all">
-                                {loading ? "CARREGANDO..." : authMode === 'login' ? "ENTRAR" : "CRIAR CONTA"}
-                            </button>
-                        </form>
-
-                        <button 
-                            onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                            className="w-full text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                            {authMode === 'login' ? "Não tem conta? Cadastre-se grátis" : "Já tem conta? Faça login"}
-                        </button>
-                    </div>
-                </div>
-            );
-
-            if (!user) return <LoginScreen />;
-
-            return (
-                <div className="min-h-screen max-w-md mx-auto flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
-                    
-                    {/* Floating Header */}
-                    <header className="p-6 flex justify-between items-center glass sticky top-0 z-40 rounded-b-[2.5rem] shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 main-gradient rounded-2xl flex items-center justify-center text-white shadow-lg"><Icon d={paths.baby} size={22}/></div>
-                            <div>
-                                <h2 className="font-extrabold text-slate-800 dark:text-white leading-none">{config.babyName}</h2>
-                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">IA Conectada</span>
-                            </div>
-                        </div>
-                        <div className="flex gap-1">
-                            <button onClick={()=>setView('donate')} className="p-3 text-pink-500 active:scale-90 transition-transform"><Icon d={paths.heart} size={20}/></button>
-                            <button onClick={()=>setView('settings')} className="p-3 text-slate-400 active:scale-90 transition-transform"><Icon d={paths.settings} size={20}/></button>
-                        </div>
-                    </header>
-
-                    {/* Main Content */}
-                    <main className="flex-1 p-6 space-y-12 pb-32">
-                        {view === 'home' && (
-                            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 animate-in fade-in slide-in-from-bottom-4">
-                                
-                                {/* Real-time Waveform */}
-                                <div className="flex items-center justify-center gap-1.5 h-16 w-full">
-                                    {visualizerData.map((h, i) => (
-                                        <div key={i} className={`w-1.5 rounded-full transition-all duration-75 ${isRecording ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800 opacity-30'}`} style={{height: `${h}px`}}></div>
-                                    ))}
-                                </div>
-
-                                {/* Action Button */}
-                                <div className="relative">
-                                    <button 
-                                        onClick={startTranslation}
-                                        disabled={isAnalyzing}
-                                        className={`w-52 h-52 rounded-full flex flex-col items-center justify-center transition-all duration-500 shadow-3xl ${isRecording ? 'bg-red-500 mic-active scale-110 shadow-red-200' : 'main-gradient shadow-indigo-100 active:scale-90'} ${isAnalyzing ? 'opacity-40 grayscale' : ''}`}
-                                    >
-                                        <Icon d={paths.mic} size={48} className="text-white mb-2" />
-                                        <span className="text-white text-[11px] font-black uppercase tracking-[0.2em]">{isRecording ? "OUVINDO..." : "TRADUZIR"}</span>
-                                    </button>
-                                </div>
-
-                                {isAnalyzing && (
-                                    <div className="w-full p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-indigo-100 dark:border-slate-800 flex items-center gap-4 animate-pulse">
-                                        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                        <div className="flex-1">
-                                            <p className="font-black text-indigo-600 dark:text-indigo-400 text-xs uppercase tracking-widest">Processando Áudio</p>
-                                            <p className="text-[10px] text-slate-400">Consultando modelos bioacústicos...</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {analysisResult && !isAnalyzing && (
-                                    <div className="w-full p-8 main-gradient text-white rounded-[3rem] shadow-2xl animate-in zoom-in duration-500">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <h3 className="text-5xl font-black tracking-tighter leading-none">{analysisResult.causa}</h3>
-                                            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black border border-white/30 uppercase">{analysisResult.confianca}%</span>
-                                        </div>
-                                        <div className="bg-black/10 p-5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                                            <p className="font-bold text-sm leading-relaxed">{analysisResult.sugestao}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {view === 'history' && (
-                            <div className="space-y-6 animate-in slide-in-from-right-4">
-                                <h2 className="text-3xl font-black tracking-tighter dark:text-white">Diário de Choro</h2>
-                                {history.length === 0 && (
-                                    <div classN
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" defer></script>
+</body>
+</html>
